@@ -1,4 +1,5 @@
 import asyncio
+import src.models # noqa: F401
 from logging.config import fileConfig
 
 from sqlalchemy import pool
