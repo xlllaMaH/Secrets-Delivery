@@ -8,9 +8,9 @@ from src.users.exceptions import UserAlreadyExists
 from src.users.schemas import UserCreate, UserRead
 from src.users.service import create_user
 
-from src.auth.exceptions import InvalidCredentials
-from src.auth.schemas import TokenPair, LoginRequest
-from src.auth.service import login
+from src.auth.exceptions import InvalidCredentials, InvalidToken
+from src.auth.schemas import TokenPair, LoginRequest, RefreshRequest
+from src.auth.service import login, refresh
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -38,4 +38,19 @@ async def login_endpoint(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='Incorrect email or password',
             headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+
+
+@router.post("/refresh", response_model=TokenPair)
+async def refresh_endpoint(
+    data: RefreshRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    try:
+        return await refresh(db, data.refresh_token)
+    except InvalidToken:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"}
         ) from None

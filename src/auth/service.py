@@ -1,8 +1,10 @@
+import uuid
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.exceptions import InvalidCredentials, InvalidToken
@@ -79,3 +81,44 @@ def decode_access_token(token: str) -> str:
         raise InvalidToken
 
     return payload["sub"]
+
+
+async def _revoke_all(db: AsyncSession, user_id: uuid.UUID, now: datetime) -> None:
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+
+
+async def refresh(db: AsyncSession, refresh_token: str) -> TokenPair:
+    token_hash = _hash_token(refresh_token)
+    now = datetime.now(UTC)
+
+    user_id = await db.scalar(
+        update(RefreshToken)
+        .where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now
+        )
+        .values(revoked_at=now)
+        .returning(RefreshToken.user_id)
+    )
+
+    if user_id is None:
+        stored = await db.scalar(
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        )
+
+        if stored is not None and stored.expires_at > now:
+            await _revoke_all(db, stored.user_id, now)
+            await db.commit()
+        raise InvalidToken
+
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active:
+        await db.commit()
+        raise InvalidToken
+
+    return await _issue_token(db, user)
