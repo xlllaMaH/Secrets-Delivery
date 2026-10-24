@@ -11,7 +11,7 @@ from src.auth.schemas import TokenPair
 from src.config import settings
 from src.crypto.passwords import hash_password, verify_password
 from src.users.models import User
-from src.users.service import get_user_by_email
+from src.users.service import get_user_by_login
 
 _dummy_hash: str | None = None
 
@@ -47,10 +47,10 @@ async def _issue_token(db: AsyncSession, user: User) -> TokenPair:
     )
 
 
-async def login(db: AsyncSession, email: str, password: str) -> TokenPair:
+async def login(db: AsyncSession, identifier: str, password: str) -> TokenPair:
     global _dummy_hash
 
-    user = await get_user_by_email(db, email.lower())
+    user = await get_user_by_login(db, identifier)
 
     if user is None:
         if _dummy_hash is None:

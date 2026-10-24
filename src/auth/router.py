@@ -32,7 +32,7 @@ async def login_endpoint(
     db: Annotated[AsyncSession, Depends(get_db,)]
 ):
     try:
-        return await login(db, data.email, data.password)
+        return await login(db, data.login, data.password)
     except InvalidCredentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
