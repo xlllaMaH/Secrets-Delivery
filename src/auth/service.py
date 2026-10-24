@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.exceptions import InvalidCredentials
+from src.auth.exceptions import InvalidCredentials, InvalidToken
 from src.auth.models import RefreshToken
 from src.auth.schemas import TokenPair
 from src.config import settings
@@ -53,7 +53,7 @@ async def login(db: AsyncSession, email: str, password: str) -> TokenPair:
     user = await get_user_by_email(db, email.lower())
 
     if user is None:
-        if _dummy_hash in None:
+        if _dummy_hash is None:
             _dummy_hash = await hash_password("dummy-password")
         await verify_password(password, _dummy_hash)
         raise InvalidCredentials
@@ -62,3 +62,20 @@ async def login(db: AsyncSession, email: str, password: str) -> TokenPair:
         raise InvalidCredentials
 
     return await _issue_token(db, user)
+
+
+def decode_access_token(token: str) -> str:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"require": ["exp", "sub"]}
+        )
+    except jwt.PyJWTError:
+        raise InvalidToken
+
+    if payload.get("type") != "access":
+        raise InvalidToken
+
+    return payload["sub"]
