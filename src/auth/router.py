@@ -1,12 +1,17 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.users.exceptions import UserAlreadyExists
 from src.users.schemas import UserCreate, UserRead
 from src.users.service import create_user
+
+from src.auth.exceptions import InvalidCredentials
+from src.auth.schemas import TokenPair
+from src.auth.service import login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -19,4 +24,19 @@ async def register(data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email or username is already taken!",
+        ) from None
+
+
+@router.post("/login", response_model=TokenPair)
+async def login_endpoint(
+    form: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db,)]
+):
+    try:
+        return await login(db, form.username, form.password)
+    except InvalidCredentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Incorrect email or password',
+            headers={"WWW-Authenticate": "Bearer"},
         ) from None

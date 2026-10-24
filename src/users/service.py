@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,3 +22,7 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
         raise UserAlreadyExists from None
     await db.refresh(user)
     return user
+
+
+async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
+    return await db.scalar(select(User).where(User.email == email))
