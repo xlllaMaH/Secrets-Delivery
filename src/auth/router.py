@@ -10,7 +10,7 @@ from src.users.service import create_user
 
 from src.auth.exceptions import InvalidCredentials, InvalidToken
 from src.auth.schemas import TokenPair, LoginRequest, RefreshRequest
-from src.auth.service import login, refresh
+from src.auth.service import login, refresh, logout
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -54,3 +54,11 @@ async def refresh_endpoint(
             detail="Invalid refresh token",
             headers={"WWW-Authenticate": "Bearer"}
         ) from None
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_endpoint(
+    data: RefreshRequest,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    await logout(db, data.refresh_token)

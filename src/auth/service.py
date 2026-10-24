@@ -122,3 +122,16 @@ async def refresh(db: AsyncSession, refresh_token: str) -> TokenPair:
         raise InvalidToken
 
     return await _issue_token(db, user)
+
+
+async def logout(db: AsyncSession, refresh_token: str) -> None:
+    await db.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.token_hash == _hash_token(refresh_token),
+            RefreshToken.revoked_at.is_(None)
+        )
+        .values(revoked_at=datetime.now(UTC))
+    )
+
+    await db.commit()
