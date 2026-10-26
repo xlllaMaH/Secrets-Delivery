@@ -24,6 +24,7 @@ dev = [
 
 [tool.ruff]
 extend-exclude = ["alembic/versions"]
+force-exclude = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
