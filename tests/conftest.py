@@ -1,15 +1,18 @@
+import hashlib
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from dotenv import dotenv_values
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import src.models  # noqa: F401
+from src.auth.models import RefreshToken
 from src.crypto.passwords import hash_password
 from src.database import Base, get_db
 from src.main import app
@@ -68,3 +71,57 @@ async def existing_user(session_maker) -> User:
         await session.commit()
         await session.refresh(user)
         return user
+
+
+async def login_user(
+    client: AsyncClient,
+    login: str = EXISTING_EMAIL,
+    password: str = EXISTING_PASSWORD,
+) -> dict[str, str]:
+    response = await client.post(
+        "/auth/login", json={"login": login, "password": password}
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def refresh_tokens_revoked_flags(session_maker) -> list[bool]:
+    """Для каждого refresh-токена по порядку создания: True, если он погашен."""
+    async with session_maker() as session:
+        rows = await session.scalars(
+            select(RefreshToken).order_by(RefreshToken.created_at)
+        )
+        return [row.revoked_at is not None for row in rows]
+
+
+async def set_user_active(session_maker, user_id: uuid.UUID, active: bool) -> None:
+    async with session_maker() as session:
+        await session.execute(
+            update(User).where(User.id == user_id).values(is_active=active)
+        )
+        await session.commit()
+
+
+async def expire_refresh_token(session_maker, token: str) -> None:
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    async with session_maker() as session:
+        await session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash)
+            .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+        await session.commit()
+
+
+@pytest.fixture
+async def tokens(client, existing_user) -> dict[str, str]:
+    return await login_user(client)
+
+
+@pytest.fixture
+def auth_headers(tokens) -> dict[str, str]:
+    return bearer(tokens["access_token"])
