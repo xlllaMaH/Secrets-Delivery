@@ -11,7 +11,7 @@ from src.auth.exceptions import InvalidCredentials, InvalidToken
 from src.auth.models import RefreshToken
 from src.auth.schemas import TokenPair
 from src.config import settings
-from src.crypto.passwords import hash_password, verify_password
+from src.crypto.passwords.hasher import hash_password, verify_password
 from src.users.models import User
 from src.users.service import get_user_by_login
 

@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.crypto.passwords import hash_password
+from src.crypto.passwords.hasher import hash_password
 from src.users.exceptions import UserAlreadyExists
 from src.users.models import User
 from src.users.schemas import UserCreate

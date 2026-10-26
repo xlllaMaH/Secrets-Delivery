@@ -13,7 +13,7 @@ from sqlalchemy.pool import NullPool
 
 import src.models  # noqa: F401
 from src.auth.models import RefreshToken
-from src.crypto.passwords import hash_password
+from src.crypto.passwords.hasher import hash_password
 from src.database import Base, get_db
 from src.main import app
 from src.users.models import User
