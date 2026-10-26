@@ -1,4 +1,4 @@
-from src.crypto.passwords import hash_password, verify_password
+from src.crypto.passwords.hasher import hash_password, verify_password
 from tests.conftest import EXISTING_PASSWORD
 
 
