@@ -3,14 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.exceptions import InvalidCredentials, InvalidToken
+from src.auth.schemas import LoginRequest, RefreshRequest, TokenPair
+from src.auth.service import login, logout, refresh
 from src.database import get_db
 from src.users.exceptions import UserAlreadyExists
 from src.users.schemas import UserCreate, UserRead
 from src.users.service import create_user
-
-from src.auth.exceptions import InvalidCredentials, InvalidToken
-from src.auth.schemas import TokenPair, LoginRequest, RefreshRequest
-from src.auth.service import login, refresh, logout
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,22 +28,26 @@ async def register(data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)
 @router.post("/login", response_model=TokenPair)
 async def login_endpoint(
     data: LoginRequest,
-    db: Annotated[AsyncSession, Depends(get_db,)]
+    db: Annotated[
+        AsyncSession,
+        Depends(
+            get_db,
+        ),
+    ],
 ):
     try:
         return await login(db, data.login, data.password)
     except InvalidCredentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Incorrect email or password',
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         ) from None
 
 
 @router.post("/refresh", response_model=TokenPair)
 async def refresh_endpoint(
-    data: RefreshRequest,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    data: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     try:
         return await refresh(db, data.refresh_token)
@@ -52,13 +55,12 @@ async def refresh_endpoint(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         ) from None
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout_endpoint(
-    data: RefreshRequest,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    data: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     await logout(db, data.refresh_token)

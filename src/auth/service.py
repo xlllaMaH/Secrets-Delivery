@@ -1,6 +1,6 @@
-import uuid
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -17,6 +17,7 @@ from src.users.service import get_user_by_login
 
 _dummy_hash: str | None = None
 
+
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -27,7 +28,7 @@ def create_access_token(user_id: str) -> str:
         "sub": user_id,
         "iat": now,
         "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_TTL_MINUTES),
-        "type": "access"
+        "type": "access",
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
@@ -38,14 +39,14 @@ async def _issue_token(db: AsyncSession, user: User) -> TokenPair:
         RefreshToken(
             user_id=user.id,
             token_hash=_hash_token(refresh_token),
-            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_TTL_DAYS)
+            expires_at=datetime.now(UTC)
+            + timedelta(days=settings.REFRESH_TOKEN_TTL_DAYS),
         )
     )
 
     await db.commit()
     return TokenPair(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=refresh_token
+        access_token=create_access_token(str(user.id)), refresh_token=refresh_token
     )
 
 
@@ -72,7 +73,7 @@ def decode_access_token(token: str) -> str:
             token,
             settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
-            options={"require": ["exp", "sub"]}
+            options={"require": ["exp", "sub"]},
         )
     except jwt.PyJWTError:
         raise InvalidToken
@@ -100,7 +101,7 @@ async def refresh(db: AsyncSession, refresh_token: str) -> TokenPair:
         .where(
             RefreshToken.token_hash == token_hash,
             RefreshToken.revoked_at.is_(None),
-            RefreshToken.expires_at > now
+            RefreshToken.expires_at > now,
         )
         .values(revoked_at=now)
         .returning(RefreshToken.user_id)
@@ -129,7 +130,7 @@ async def logout(db: AsyncSession, refresh_token: str) -> None:
         update(RefreshToken)
         .where(
             RefreshToken.token_hash == _hash_token(refresh_token),
-            RefreshToken.revoked_at.is_(None)
+            RefreshToken.revoked_at.is_(None),
         )
         .values(revoked_at=datetime.now(UTC))
     )

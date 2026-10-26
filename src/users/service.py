@@ -27,8 +27,10 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return await db.scalar(select(User).where(User.email == email))
 
+
 async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
     return await db.scalar(select(User).where(User.username == username))
+
 
 async def get_user_by_login(db: AsyncSession, login: str) -> User | None:
     if "@" in login:

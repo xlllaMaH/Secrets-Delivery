@@ -15,12 +15,13 @@ bearer_scheme = HTTPBearer()
 _credentials_error = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Could not validate credentials",
-    headers={"WWW-Authenticate": "Bearer"}
+    headers={"WWW-Authenticate": "Bearer"},
 )
 
+
 async def get_current_user(
-        credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
-        db: Annotated[AsyncSession, Depends(get_db)]
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     try:
         user_id = uuid.UUID(decode_access_token(credentials.credentials))
