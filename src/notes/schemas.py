@@ -27,3 +27,11 @@ class NoteCreated(BaseModel):
     key: str
     expires_at: datetime
     max_views: int
+
+
+class RevealRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=128)
+
+
+class NoteContent(BaseModel):
+    text: str
