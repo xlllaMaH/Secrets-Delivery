@@ -94,10 +94,11 @@ async def reveal_note(
 def get_status(note: Note, now: datetime) -> NoteStatus:
     if note.archived_at is not None:
         return NoteStatus.ARCHIVED
-    if note.expires_at is not None:
+    if note.consumed_at is not None:
         return NoteStatus.CONSUMED
     if note.expires_at <= now:
-        return NoteStatus.ACTIVE
+        return NoteStatus.EXPIRED
+    return NoteStatus.ACTIVE
 
 
 def to_read(note: Note, now: datetime) -> NoteRead:
@@ -121,11 +122,11 @@ async def list_note(
     is_active = and_(
         Note.archived_at.is_(None), Note.consumed_at.is_(None), Note.expires_at > now
     )
-    condition = is_active if scope == NoteFilter.ACTRIVE else not_(is_active)
+    condition = is_active if scope == NoteFilter.ACTIVE else not_(is_active)
     where = (Note.owner_id == owner.id, condition)
 
-    total = await db.scalar(select(func.count()).select_from_from(Note).where(*where))
-    notes = await db.scalar(
+    total = await db.scalar(select(func.count()).select_from(Note).where(*where))
+    notes = await db.scalars(
         select(Note)
         .where(*where)
         .order_by(Note.created_at.desc(), Note.id.desc())

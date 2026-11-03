@@ -47,7 +47,7 @@ class NoteStatus(StrEnum):
 
 
 class NoteFilter(StrEnum):
-    ACTRIVE = "active"
+    ACTIVE = "active"
     ARCHIVE = "archive"
 
 
