@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -13,9 +14,16 @@ from src.notes.schemas import (
     NoteCreated,
     NoteFilter,
     NotePage,
+    NoteRead,
     RevealRequest,
 )
-from src.notes.service import create_note, list_note, reveal_note
+from src.notes.service import (
+    archive_note,
+    create_note,
+    get_note,
+    list_note,
+    reveal_note,
+)
 from src.users.models import User
 
 router = APIRouter(prefix="/notes", tags=["notes"])
@@ -59,3 +67,31 @@ async def list_my_notes(
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
     return await list_note(db, user, scope, limit, offset)
+
+
+@router.get("/{note_id}", response_model=NoteRead)
+async def get_my_note(
+    note_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        return await get_note(db, user, note_id)
+    except NoteNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        ) from None
+
+
+@router.post("/{note_id}/archive", response_model=NoteRead)
+async def archive(
+    note_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        return await archive_note(db, user, note_id)
+    except NoteNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        ) from None

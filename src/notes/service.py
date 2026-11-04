@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, case, func, not_, select, update
@@ -135,3 +136,28 @@ async def list_note(
     )
 
     return NotePage(items=[to_read(note, now) for note in notes], total=total)
+
+
+async def get_note(db: AsyncSession, owner: User, note_id: uuid.UUID) -> NoteRead:
+    note = await db.scalar(
+        select(Note).where(Note.id == note_id, Note.owner_id == owner.id)
+    )
+    if note is None:
+        raise NoteNotFound
+    return to_read(note, datetime.now(UTC))
+
+
+async def archive_note(db: AsyncSession, owner: User, note_id: uuid.UUID) -> NoteRead:
+    await db.execute(
+        update(Note)
+        .where(
+            Note.id == note_id,
+            Note.owner_id == owner.id,
+            Note.archived_at.is_(None),
+        )
+        .values(archived_at=datetime.now(UTC), payload=None)
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+
+    return await get_note(db, owner, note_id)
