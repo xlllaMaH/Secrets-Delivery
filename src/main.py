@@ -11,7 +11,7 @@ def create_app(app_settings: Settings=settings) -> FastAPI:
     docs = app_settings.DOCS_ENABLED
     app = FastAPI(
         title="Secret Delivery",
-        docs_url="/doc" if docs else None,
+        docs_url="/docs" if docs else None,
         redoc_url="/redoc" if docs else None,
         openapi_url='/openapi.json' if docs else None
     )
