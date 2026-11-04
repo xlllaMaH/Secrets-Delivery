@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from src.auth.router import router as auth_router
+from src.health.router import router as health_router
 from src.notes.router import router as notes_router
 from src.users.router import router as users_router
 
@@ -9,3 +10,4 @@ app = FastAPI(title="Secret Delivery")
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(notes_router)
+app.include_router(health_router)
