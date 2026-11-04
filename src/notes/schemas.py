@@ -1,4 +1,6 @@
+import uuid
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -35,3 +37,32 @@ class RevealRequest(BaseModel):
 
 class NoteContent(BaseModel):
     text: str
+
+
+class NoteStatus(StrEnum):
+    ACTIVE = "active"
+    CONSUMED = "consumed"
+    EXPIRED = "expired"
+    ARCHIVED = "archived"
+
+
+class NoteFilter(StrEnum):
+    ACTIVE = "active"
+    ARCHIVE = "archive"
+
+
+class NoteRead(BaseModel):
+    id: uuid.UUID
+    title: str | None
+    status: NoteStatus
+    max_views: int
+    views_count: int
+    created_at: datetime
+    expires_at: datetime
+    consumed_at: datetime | None
+    archived_at: datetime | None
+
+
+class NotePage(BaseModel):
+    items: list[NoteRead]
+    total: int

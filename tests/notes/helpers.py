@@ -51,3 +51,10 @@ async def other_user_headers(client: AsyncClient) -> dict[str, str]:
     )
     assert login.status_code == 200
     return bearer(login.json()["access_token"])
+
+
+async def create_note_with_id(
+    client: AsyncClient, headers: dict[str, str], session_maker, **payload
+) -> tuple[dict, str]:
+    note = await create_note_via_api(client, headers, **payload)
+    return note, str((await get_note(session_maker, note["token"])).id)
