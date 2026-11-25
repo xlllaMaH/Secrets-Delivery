@@ -1,8 +1,6 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
-import src.cleanup.__main__ as cleanup_command
 from src.auth.models import RefreshToken
-from src.cleanup.service import run_cleanup
 from tests.conftest import expire_refresh_token, login_user
 from tests.notes.helpers import (
     create_note_via_api,
@@ -14,7 +12,10 @@ from tests.notes.helpers import (
 
 async def cleanup(session_maker):
     async with session_maker() as session:
-        return await run_cleanup(session)
+        result = await session.execute(text("SELECT * FROM cleanup_expired()"))
+        stats = result.one()
+        await session.commit()
+        return stats
 
 
 async def count_refresh_tokens(session_maker) -> int:
@@ -36,7 +37,7 @@ async def test_cleanup_wipes_payload_of_expired_note(
 
     stats = await cleanup(session_maker)
 
-    assert stats.notes == 1
+    assert stats.wiped_notes == 1
     stored = await get_note(session_maker, note["token"])
     assert stored is not None
     assert stored.payload is None
@@ -59,7 +60,7 @@ async def test_cleanup_does_not_touch_active_note(client, auth_headers, session_
 
     stats = await cleanup(session_maker)
 
-    assert stats.notes == 0
+    assert stats.wiped_notes == 0
     assert (await get_note(session_maker, note["token"])).payload is not None
     response = await client.post(reveal_url(note["token"]), json={"key": note["key"]})
     assert response.status_code == 200
@@ -74,7 +75,7 @@ async def test_cleanup_does_not_count_already_wiped_note(
 
     stats = await cleanup(session_maker)
 
-    assert stats.notes == 0
+    assert stats.wiped_notes == 0
 
 
 async def test_cleanup_is_idempotent(client, auth_headers, session_maker):
@@ -84,7 +85,7 @@ async def test_cleanup_is_idempotent(client, auth_headers, session_maker):
     first = await cleanup(session_maker)
     second = await cleanup(session_maker)
 
-    assert first.notes == 1
+    assert first.wiped_notes == 1
     assert tuple(second) == (0, 0)
 
 
@@ -97,7 +98,7 @@ async def test_cleanup_deletes_only_expired_refresh_tokens(
 
     stats = await cleanup(session_maker)
 
-    assert stats.tokens == 1
+    assert stats.deleted_tokens == 1
     assert await count_refresh_tokens(session_maker) == 1
     refreshed = await client.post(
         "/auth/refresh", json={"refresh_token": second["refresh_token"]}
@@ -112,7 +113,7 @@ async def test_cleanup_keeps_revoked_but_unexpired_refresh_token(
 
     stats = await cleanup(session_maker)
 
-    assert stats.tokens == 0
+    assert stats.deleted_tokens == 0
     assert await count_refresh_tokens(session_maker) == 1
 
 
@@ -124,14 +125,5 @@ async def test_cleanup_deletes_revoked_and_expired_refresh_token(
 
     stats = await cleanup(session_maker)
 
-    assert stats.tokens == 1
+    assert stats.deleted_tokens == 1
     assert await count_refresh_tokens(session_maker) == 0
-
-
-async def test_cleanup_command_runs_and_reports(session_maker, monkeypatch, capsys):
-    monkeypatch.setattr(cleanup_command, "async_session_maker", session_maker)
-
-    await cleanup_command.main()
-
-    output = capsys.readouterr().out
-    assert "wiped notes: 0, deleted refresh tokens: 0" in output
