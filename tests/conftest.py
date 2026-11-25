@@ -1,20 +1,25 @@
+import asyncio
 import hashlib
 import os
+import subprocess
+import sys
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from dotenv import dotenv_values
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import src.models  # noqa: F401
 from src.auth.models import RefreshToken
 from src.crypto.passwords.hasher import hash_password
-from src.database import Base, get_db
+from src.database import get_db
 from src.main import app
 from src.users.models import User
 
@@ -25,15 +30,42 @@ TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL") or dotenv_values(".env").get(
 EXISTING_EMAIL = "existing@example.com"
 EXISTING_USERNAME = "existing_user"
 EXISTING_PASSWORD = "correct-test-password1!"
+ROOT = Path(__file__).resolve().parents[1]
+
+
+async def reset_schema(url: str) -> None:
+    engine = create_async_engine(url, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+    await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def migrated_database() -> str:
+    if not TEST_DATABASE_URL:
+        pytest.fail("TEST_DATABASE_URL is not set")
+    if not make_url(TEST_DATABASE_URL).database.endswith("_test"):
+        pytest.fail("TEST_DATABASE_URL database name must end with _test")
+
+    asyncio.run(reset_schema(TEST_DATABASE_URL))
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=ROOT,
+        check=False,
+        env={**os.environ, "DATABASE_URL": TEST_DATABASE_URL},
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"alembic upgrade failed: \n{result.stderr}")
+    return TEST_DATABASE_URL
 
 
 @pytest.fixture
-async def engine():
-    if not TEST_DATABASE_URL:
-        pytest.fail("TEST_DATABASE_URL is not set")
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+async def engine(migrated_database):
+    engine = create_async_engine(migrated_database, poolclass=NullPool)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
         await conn.execute(text("TRUNCATE TABLE users CASCADE"))
     yield engine
     await engine.dispose()
